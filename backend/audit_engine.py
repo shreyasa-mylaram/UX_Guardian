@@ -60,27 +60,65 @@ def generate_ai_analysis(dom_path, screenshot_path, axe_results):
     
     Identify the top 5 UX/UI or Accessibility issues.
     For each issue, provide:
-    1. Category (Accessibility, UX, SEO, Performance)
-    2. Severity (low, medium, high, critical)
-    3. Title (Short description)
-    4. Description (Conversational explanation of root cause and business/user impact)
-    5. Recommendation (How to fix it)
-    6. Selector (CSS selector of the element, if applicable)
-    7. Code Snippet (HTML/CSS of the current state, if applicable)
-    8. Fixed Code (HTML/CSS/Tailwind of the recommended fix)
+    1. "category": "Accessibility", "UX", "SEO", or "Performance"
+    2. "severity": "low", "medium", "high", or "critical"
+    3. "title": Short description of the issue.
+    4. "description": Conversational explanation of root cause and business/user impact.
+    5. "recommendation": How to fix it (conversational tone).
+    6. "selector": CSS selector of the element, if applicable.
+    7. "code_snippet": HTML/CSS of the current state, if applicable.
+    8. "fixed_code": HTML/CSS using Tailwind CSS utility classes and React formatting (e.g. className instead of class) of the recommended fix.
     
-    Return the response as a JSON array of objects with the exact keys: category, severity, title, description, recommendation, selector, code_snippet, fixed_code.
-    Ensure the JSON is valid and ONLY output JSON. Do not include markdown code block syntax (like ```json).
+    You must return a valid JSON array of objects.
     """
 
     try:
-        response = model.generate_content([prompt, image_parts[0]])
+        response = model.generate_content(
+            [prompt, image_parts[0]],
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json"
+            )
+        )
         # Parse the JSON response
         response_text = response.text.strip()
-        if response_text.startswith("```json"):
-            response_text = response_text[7:-3]
         issues = json.loads(response_text)
         return issues
     except Exception as e:
         print(f"Error generating AI analysis: {e}")
         return []
+
+def generate_chat_response(user_message: str, chat_history: list, audit_context: str):
+    """
+    Answers a developer's question about the audit using the Gemini API.
+    """
+    if not api_key:
+        return "GEMINI_API_KEY not set. Cannot generate response."
+
+    model = genai.GenerativeModel('gemini-1.5-pro')
+    
+    # Construct the system context
+    system_prompt = f"""
+    You are an expert UX/UI auditor and Developer Assistant. 
+    You are helping a developer fix issues found in their website audit.
+    
+    Here is the context of the audit (the issues found):
+    {audit_context}
+    
+    Answer the developer's questions clearly, providing code snippets if necessary.
+    """
+    
+    # Format history for Gemini
+    formatted_history = []
+    for msg in chat_history:
+        formatted_history.append({
+            "role": "model" if msg.role == "model" else "user",
+            "parts": [msg.content]
+        })
+    
+    try:
+        chat = model.start_chat(history=formatted_history)
+        response = chat.send_message(f"SYSTEM CONTEXT: {system_prompt}\n\nUSER QUESTION: {user_message}")
+        return response.text
+    except Exception as e:
+        print(f"Error generating chat response: {e}")
+        return "I'm sorry, I encountered an error while trying to answer your question."

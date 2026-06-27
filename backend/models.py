@@ -27,3 +27,12 @@ class Issue(Base):
     selector = Column(String, nullable=True) # CSS selector
     code_snippet = Column(Text, nullable=True) # HTML/CSS
     fixed_code = Column(Text, nullable=True) # AI generated fix
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    audit_id = Column(Integer, index=True)
+    role = Column(String) # 'user' or 'model'
+    content = Column(Text)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
