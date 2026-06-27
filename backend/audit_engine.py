@@ -63,13 +63,16 @@ def generate_ai_analysis(dom_path, screenshot_path, axe_results):
     1. "category": "Accessibility", "UX", "SEO", or "Performance"
     2. "severity": "low", "medium", "high", or "critical"
     3. "title": Short description of the issue.
-    4. "description": Conversational explanation of root cause and business/user impact.
-    5. "recommendation": How to fix it (conversational tone).
-    6. "selector": CSS selector of the element, if applicable.
-    7. "code_snippet": HTML/CSS of the current state, if applicable.
-    8. "fixed_code": HTML/CSS using Tailwind CSS utility classes and React formatting (e.g. className instead of class) of the recommended fix.
+    4. "description": Conversational explanation of root cause and user impact.
+    5. "business_impact": "High", "Medium", or "Low" (e.g., Conversion Loss, Legal Risk).
+    6. "confidence_score": Integer from 0 to 100 representing your confidence in this issue.
+    7. "estimated_fix_time": String (e.g., "2 minutes", "1 hour", "Easy").
+    8. "recommendation": How to fix it (conversational tone).
+    9. "selector": CSS selector of the element, if applicable.
+    10. "code_snippet": HTML/CSS of the current state, if applicable.
+    11. "fixed_code": HTML/CSS using Tailwind CSS utility classes and React formatting (e.g. className instead of class) of the recommended fix.
     
-    You must return a valid JSON array of objects.
+    You must return a valid JSON array of objects with the exact keys: category, severity, title, description, business_impact, confidence_score, estimated_fix_time, recommendation, selector, code_snippet, fixed_code.
     """
 
     try:

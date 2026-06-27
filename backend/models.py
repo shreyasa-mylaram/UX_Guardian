@@ -27,6 +27,9 @@ class Issue(Base):
     selector = Column(String, nullable=True) # CSS selector
     code_snippet = Column(Text, nullable=True) # HTML/CSS
     fixed_code = Column(Text, nullable=True) # AI generated fix
+    business_impact = Column(String, nullable=True) # High, Medium, Low
+    confidence_score = Column(Integer, nullable=True) # 0-100
+    estimated_fix_time = Column(String, nullable=True) # e.g. '2 minutes'
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
