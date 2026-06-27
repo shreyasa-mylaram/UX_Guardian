@@ -83,6 +83,24 @@ async def process_audit(audit_id: int, url: str, db_session: Session):
         )
         db_session.add(db_issue)
         
+    # Process performance metrics from Playwright
+    perf = scan_results.get("performance", {})
+    load_time_ms = perf.get("loadTime", 0)
+    if load_time_ms > 3000:
+        overall_score -= 10
+        perf_issue = models.Issue(
+            audit_id=audit_id,
+            category="Performance",
+            severity="high" if load_time_ms > 6000 else "medium",
+            title="High Page Load Time",
+            description=f"The page took {load_time_ms / 1000:.2f} seconds to load. Slow pages lead to higher bounce rates and worse SEO rankings.",
+            recommendation="Optimize images, minify CSS/JS, and leverage browser caching to improve load times.",
+            selector="",
+            code_snippet="",
+            fixed_code=""
+        )
+        db_session.add(perf_issue)
+        
     overall_score = max(0, overall_score)
     
     # Update Audit status
@@ -113,3 +131,89 @@ def get_audit(audit_id: int, db: Session = Depends(get_db)):
     issues = db.query(models.Issue).filter(models.Issue.audit_id == audit_id).all()
     
     return {"audit": audit, "issues": issues}
+
+class ChatRequest(BaseModel):
+    message: str
+
+@app.post("/api/audits/{audit_id}/chat")
+def post_chat(audit_id: int, chat_req: ChatRequest, db: Session = Depends(get_db)):
+    # Verify audit exists
+    audit = db.query(models.Audit).filter(models.Audit.id == audit_id).first()
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit not found")
+        
+    # Save user message
+    user_msg = models.ChatMessage(audit_id=audit_id, role="user", content=chat_req.message)
+    db.add(user_msg)
+    db.commit()
+    
+    # Get history
+    history = db.query(models.ChatMessage).filter(models.ChatMessage.audit_id == audit_id).order_by(models.ChatMessage.created_at).all()
+    
+    # Build context from issues
+    issues = db.query(models.Issue).filter(models.Issue.audit_id == audit_id).all()
+    context = "\n".join([f"- {i.title} ({i.severity}): {i.description}" for i in issues])
+    
+    # Generate response
+    from audit_engine import generate_chat_response
+    ai_response_text = generate_chat_response(chat_req.message, history[:-1], context) # pass history without current message
+    
+    # Save model message
+    model_msg = models.ChatMessage(audit_id=audit_id, role="model", content=ai_response_text)
+    db.add(model_msg)
+    db.commit()
+    
+    return {"role": "model", "content": ai_response_text}
+
+@app.get("/api/audits/{audit_id}/chat")
+def get_chat(audit_id: int, db: Session = Depends(get_db)):
+    history = db.query(models.ChatMessage).filter(models.ChatMessage.audit_id == audit_id).order_by(models.ChatMessage.created_at).all()
+    return {"history": history}
+
+@app.get("/api/audits/{audit_id}/export")
+def export_audit_pdf(audit_id: int, db: Session = Depends(get_db)):
+    audit = db.query(models.Audit).filter(models.Audit.id == audit_id).first()
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit not found")
+        
+    issues = db.query(models.Issue).filter(models.Issue.audit_id == audit_id).all()
+    
+    from fastapi.responses import Response
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    import io
+    
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    
+    # Title
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(50, height - 50, f"UX Guardian Audit Report")
+    c.setFont("Helvetica", 12)
+    c.drawString(50, height - 70, f"URL: {audit.url}")
+    c.drawString(50, height - 90, f"Overall Score: {audit.overall_score}/100")
+    
+    y = height - 130
+    for issue in issues:
+        if y < 100:
+            c.showPage()
+            y = height - 50
+            
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, y, f"[{issue.severity.upper()}] {issue.title}")
+        y -= 20
+        c.setFont("Helvetica", 10)
+        
+        # Simple text wrapping could be added here, but for MVP we truncate or let it run
+        desc = (issue.description[:100] + '..') if len(issue.description) > 100 else issue.description
+        c.drawString(70, y, desc)
+        y -= 30
+        
+    c.save()
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={
+        "Content-Disposition": f"attachment; filename=audit_{audit_id}.pdf"
+    })

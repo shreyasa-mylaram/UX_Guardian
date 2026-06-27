@@ -46,6 +46,16 @@ async def run_browser_scan(url: str, output_dir: str = "artifacts"):
         # Run axe-core
         axe_results = await run_axe_core(page)
         
+        # Extract basic performance metrics
+        performance_timing = await page.evaluate("""() => {
+            const timing = window.performance.timing;
+            return {
+                loadTime: timing.loadEventEnd - timing.navigationStart,
+                domReadyTime: timing.domContentLoadedEventEnd - timing.navigationStart,
+                ttfb: timing.responseStart - timing.navigationStart
+            };
+        }""")
+        
         await browser.close()
         
     return {
@@ -53,5 +63,6 @@ async def run_browser_scan(url: str, output_dir: str = "artifacts"):
         "screenshot_path": screenshot_path,
         "dom_path": dom_path,
         "url": url,
-        "axe_results": axe_results
+        "axe_results": axe_results,
+        "performance": performance_timing
     }
