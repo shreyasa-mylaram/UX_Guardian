@@ -152,6 +152,11 @@ export function VisualPreviewModal({ isOpen, onClose, issue, onApplied }: Visual
                     </p>
                   </div>
 
+                  <div className="flex items-center gap-2 rounded-full bg-white/5 px-4 py-1.5 border border-white/10">
+                    <span className="text-xs font-semibold text-slate-400">Powered by</span>
+                    <span className="text-sm font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Smallest.ai AWAAZ</span>
+                  </div>
+
                   <div className="h-24 w-full bg-slate-900/50 rounded-2xl border border-white/5 p-6 flex items-center justify-center relative overflow-hidden">
                     <Volume2 className="absolute left-6 h-5 w-5 text-slate-600" />
                     <p className={`text-xl font-medium tracking-wide ${empathyPhase === 'fixed' ? 'text-emerald-400' : 'text-slate-200'}`}>
