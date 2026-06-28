@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Float, Sphere, MeshDistortMaterial, GradientTexture } from '@react-three/drei'
+import { Float, Sphere, MeshDistortMaterial } from '@react-three/drei'
 import * as THREE from 'three'
 
 /* ─── Floating Orbs ─────────────────────────────── */
@@ -11,7 +11,7 @@ function FloatingOrb({ position, color, scale = 1, speed = 1 }: {
   speed?: number
 }) {
   const meshRef = useRef<THREE.Mesh>(null)
-  useFrame((state) => {
+  useFrame((state: any) => {
     if (!meshRef.current) return
     meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * speed + position[0]) * 0.4
     meshRef.current.rotation.z += 0.003 * speed

@@ -48,7 +48,7 @@ export class SpeechEngine {
   }
 
   generateScreenReaderScript(issues: any[]) {
-    if (!issues || issues.length === 0) return "Page is accessible. No issues found."
+    if (!issues || issues.length === 0) return [{ text: "Page is accessible. No issues found." }]
 
     const issueDescriptions = issues.map((issue) => {
       // Create a garbled, confusing description of what a screen reader would see
@@ -68,7 +68,11 @@ export class SpeechEngine {
       return `${elementType}. Error: ${issue.title}.`
     })
 
-    return `Heading Level 1. Main Navigation. ${issueDescriptions.join(" ")} End of main region.`
+    return [
+      { text: "Heading Level 1. Main Navigation." },
+      ...issueDescriptions.map(desc => ({ text: desc })),
+      { text: "End of main region." }
+    ]
   }
 
   stop() {

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import type { Issue } from '../store'
 import { useStore } from '../store'
 import { applyIssueFix, API_BASE_URL } from '../lib/api'
-import { speechEngine, generateScreenReaderScript } from '../lib/speech'
+import { speechEngine } from '../lib/speech'
 import { Eye, EyeOff, Ear, CheckCircle, Volume2 } from 'lucide-react'
 
 interface VisualPreviewModalProps {
@@ -38,7 +38,7 @@ export function VisualPreviewModal({ isOpen, onClose, issue, onApplied }: Visual
       return
     }
 
-    const script = generateScreenReaderScript(allIssues, empathyPhase === 'fixed')
+    const script = speechEngine.generateScreenReaderScript(allIssues)
     
     // Play the script sequentially with fake subtitles
     let cancelled = false
@@ -53,12 +53,15 @@ export function VisualPreviewModal({ isOpen, onClose, issue, onApplied }: Visual
       const phrase = script[currentIndex]
       setCurrentSubtitle(phrase.text)
       
-      speechEngine.speak(phrase.text, () => {
+      speechEngine.speak(phrase.text)
+      
+      // Wait for a rough estimation of the speech duration before playing next
+      setTimeout(() => {
         currentIndex++
         if (!cancelled) {
           playNext()
         }
-      })
+      }, phrase.text.length * 70) // roughly 70ms per character
     }
 
     // Start playing

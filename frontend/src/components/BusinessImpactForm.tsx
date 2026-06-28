@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Calculator, CheckCircle2, ChevronRight, Settings2, TrendingDown } from 'lucide-react'
+import { Calculator, CheckCircle2, Settings2, TrendingDown } from 'lucide-react'
 import { INDUSTRY_PRESETS, type BusinessContext } from '../lib/impact-calculator'
 import { useStore } from '../store'
 import { GlassCard } from './GlassCard'
