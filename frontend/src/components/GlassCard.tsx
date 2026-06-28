@@ -18,18 +18,12 @@ export function GlassCard({
   onClick,
 }: GlassCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
-  const [tilt, setTilt] = useState({ x: 0, y: 0 })
   const [isHovered, setIsHovered] = useState(false)
   const [shimmerPos, setShimmerPos] = useState({ x: 50, y: 50 })
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return
     const rect = cardRef.current.getBoundingClientRect()
-    const cx = rect.left + rect.width / 2
-    const cy = rect.top + rect.height / 2
-    const dx = (e.clientX - cx) / (rect.width / 2)
-    const dy = (e.clientY - cy) / (rect.height / 2)
-    setTilt({ x: dy * -14, y: dx * 14 }) // More aggressive tilt
     setShimmerPos({
       x: ((e.clientX - rect.left) / rect.width) * 100,
       y: ((e.clientY - rect.top) / rect.height) * 100,
@@ -42,16 +36,15 @@ export function GlassCard({
       animate={float ? { y: [0, -8, 0] } : {}}
       transition={float ? { duration: 5.5, repeat: Infinity, ease: 'easeInOut' } : {}}
       style={{
-        transform: `perspective(800px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(${isHovered ? 1.025 : 1})`,
+        transform: `scale(${isHovered ? 1.02 : 1})`,
         boxShadow: isHovered
-          ? `0 30px 80px ${glowColor}, 0 12px 30px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.95)`
+          ? `0 20px 40px ${glowColor}, 0 8px 16px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.95)`
           : `0 8px 32px rgba(249,115,22,0.07), 0 2px 8px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.85)`,
-        transition: 'box-shadow 0.3s ease, transform 0.08s ease',
-        transformStyle: 'preserve-3d',
+        transition: 'box-shadow 0.3s ease, transform 0.2s ease',
       }}
       className={`glass rounded-3xl relative overflow-hidden cursor-default ${className}`}
       onMouseMove={handleMouseMove}
-      onMouseLeave={() => { setTilt({ x: 0, y: 0 }); setIsHovered(false) }}
+      onMouseLeave={() => setIsHovered(false)}
       onMouseEnter={() => setIsHovered(true)}
       onClick={onClick}
     >
