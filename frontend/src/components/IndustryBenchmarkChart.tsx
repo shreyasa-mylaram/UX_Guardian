@@ -20,8 +20,8 @@ export function IndustryBenchmarkChart() {
   const userScores = calculateCategoryScores(issues)
   
   // Calculate average scores across the 4 categories
-  const avgUserScore = Object.values(userScores).reduce((a, b) => a + b, 0) / 4
-  const avgIndustryScore = Object.values(benchmarks).reduce((a, b) => a + b.average, 0) / 4
+  const avgUserScore = Object.values(userScores).reduce((a: number, b: number) => a + b, 0) / 4
+  const avgIndustryScore = Object.values(benchmarks).reduce((a: number, b: any) => a + b.average, 0) / 4
   
   // Calculate gap financial impact (naive but illustrative model for the hackathon)
   // E.g., for every point below average, we assume 0.25% drop in potential revenue

@@ -56,7 +56,6 @@ function ScoreRing({ value, size = 120 }: { value: number | null; size?: number 
 export function ScoreDashboard({ overall, issues }: ScoreDashboardProps) {
   const { businessContext } = useStore()
   const breakdown = getIssueBreakdown(issues)
-  const totalIssues = issues.length
   const urgentIssues = issues.filter((i) => ['critical', 'high'].includes(i.severity.toLowerCase())).length
   const quickWins = issues.filter((i) => i.estimated_fix_time?.toLowerCase().includes('min')).length
 
@@ -157,7 +156,7 @@ export function ScoreDashboard({ overall, issues }: ScoreDashboardProps) {
                 }}
               />
               <Bar dataKey="count" radius={[14, 14, 4, 4]}>
-                {breakdown.map((entry) => (
+                {breakdown.map((entry: any) => (
                   <Cell key={entry.name} fill={entry.fill} />
                 ))}
               </Bar>
@@ -166,7 +165,7 @@ export function ScoreDashboard({ overall, issues }: ScoreDashboardProps) {
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {breakdown.map((item) => (
+          {breakdown.map((item: any) => (
             <GlassCard key={item.name} className="p-4">
               <div className="flex items-center gap-2.5">
                 <span className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.fill }} />
