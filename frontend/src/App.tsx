@@ -1,213 +1,217 @@
-import React from 'react'
+import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
+import { MessageSquareText } from 'lucide-react'
+
+import { AuditForm } from './components/AuditForm'
+import { CommandPalette } from './components/CommandPalette'
+import { ChatWidget } from './components/ChatWidget'
+import { DashboardLayout } from './components/DashboardLayout'
+import { DeveloperChecklist } from './components/DeveloperChecklist'
+import { IssueCard } from './components/IssueCard'
+import { LandingPage } from './components/LandingPage'
+import { LoginForm } from './components/LoginForm'
+import { RegisterForm } from './components/RegisterForm'
+import { HistoryView } from './components/HistoryView'
+import { ScanProgress } from './components/ScanProgress'
+import { ScoreDashboard } from './components/ScoreDashboard'
+import { fetchAudit, downloadAuditExport, fetchMe, createAudit } from './lib/api'
 import { useStore } from './store'
-import { Activity, AlertTriangle, CheckCircle, Search, Code, LayoutDashboard } from 'lucide-react'
+
+const listVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+    },
+  },
+}
 
 function App() {
-  const { audit, loading, setAudit, setLoading } = useStore()
-  const [url, setUrl] = React.useState('')
-  const [polling, setPolling] = React.useState(false)
+  const { audit, setAudit, loading, setLoading, scanStep, activeTab, token, login, logout, resetChatForAudit, setScanStep } = useStore()
+  const [url, setUrl] = useState('')
+  const [showLanding, setShowLanding] = useState(true)
+  const issues = audit?.issues ?? []
+  const urgentIssues = issues.filter((issue) => ['critical', 'high'].includes(issue.severity.toLowerCase())).length
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!url) return
-    setLoading(true)
-    
-    try {
-      const res = await fetch('http://localhost:8000/api/audits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
+  useEffect(() => {
+    if (token) {
+      fetchMe().then(user => {
+        login(user, token)
+      }).catch(() => {
+        logout()
       })
-      const data = await res.json()
-      setAudit(data)
-      setPolling(true)
-    } catch (err) {
-      console.error(err)
-      setLoading(false)
+    }
+  }, [token, login, logout])
+
+  useEffect(() => {
+    if (audit?.status === 'running') {
+      const interval = setInterval(async () => {
+        try {
+          const updatedAudit = await fetchAudit(audit.id)
+          if (updatedAudit.status === 'completed' || updatedAudit.status === 'failed') {
+            setAudit(updatedAudit)
+            setLoading(false)
+            setScanStep(7)
+          }
+        } catch (error) {
+          console.error('Failed to fetch audit status:', error)
+        }
+      }, 1500)
+      return () => clearInterval(interval)
+    }
+  }, [audit?.id, audit?.status, setAudit, setLoading, setScanStep])
+
+  const handleDownloadPDF = async () => {
+    if (audit?.id) {
+      try {
+        await downloadAuditExport(audit.id)
+      } catch (e) {
+        console.error(e)
+        alert('Failed to download PDF')
+      }
     }
   }
 
-  React.useEffect(() => {
-    if (!polling || !audit?.audit_id) return
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!url) return
+    setLoading(true)
+    setScanStep(0)
+    
+    const stepInterval = window.setInterval(() => {
+      setScanStep((prev) => (prev >= 6 ? 6 : prev + 1))
+    }, 1500)
 
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`http://localhost:8000/api/audits/${audit.audit_id}`)
-        if (res.ok) {
-          const data = await res.json()
-          setAudit({ ...data.audit, issues: data.issues })
-          if (data.audit.status === 'completed' || data.audit.status === 'failed') {
-            setPolling(false)
-            setLoading(false)
-          }
-        }
-      } catch (err) {
-        console.error(err)
-      }
-    }, 2000)
+    try {
+      const createdAudit = await createAudit(url)
+      setAudit(createdAudit)
+      resetChatForAudit(createdAudit.id)
+      resetChatForAudit(createdAudit.id)
+    } catch (error) {
+      console.error(error)
+      setLoading(false)
+      window.clearInterval(stepInterval)
+    }
+  }
 
-    return () => clearInterval(interval)
-  }, [polling, audit?.audit_id, setAudit, setLoading])
+  const renderContent = () => {
+    if (activeTab === 'login') return <LoginForm />
+    if (activeTab === 'register') return <RegisterForm />
+    if (activeTab === 'history') return <HistoryView />
+    
+    // Dashboard logic below
+    if (!audit && !loading) {
+      return (
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <AuditForm url={url} loading={loading} onUrlChange={setUrl} onSubmit={handleSubmit} />
+        </div>
+      )
+    }
+
+    if (loading || audit?.status === 'running') {
+      return (
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <ScanProgress stepIndex={scanStep} />
+        </div>
+      )
+    }
+
+    if (audit?.status === 'failed') {
+      return (
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <div className="glass rounded-3xl p-8 text-center border-red-200/50">
+            <h2 className="mb-2 text-xl font-black text-red-600">Scan Failed</h2>
+            <p className="text-stone-500">There was an error scanning the URL. Please try again.</p>
+            <button 
+              onClick={() => { setAudit(null); setLoading(false); }}
+              className="mt-6 rounded-2xl border border-red-200/60 bg-red-50/80 px-6 py-2.5 font-semibold text-red-600 hover:bg-red-100/80 transition"
+            >
+              Start New Scan
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="grid gap-8 xl:grid-cols-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="space-y-6 xl:col-span-8">
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+            <ScoreDashboard overall={audit!.overall_score} issues={issues} />
+          </motion.div>
+
+          <motion.section
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.08 }}
+            className="glass rounded-[28px] p-6 shadow-xl"
+          >
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400/70">Issue Explorer</p>
+                <h3 className="mt-2 text-3xl font-black tracking-tight text-stone-800">
+                  Review findings & ship fixes faster
+                </h3>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-amber-200/50 bg-white/60 p-4 backdrop-blur-sm">
+                  <p className="text-xs uppercase tracking-[0.24em] text-stone-500">Total Findings</p>
+                  <p className="mt-2 text-3xl font-black text-stone-800">{issues.length}</p>
+                </div>
+                <div className="rounded-2xl border border-orange-200/50 bg-orange-50/60 p-4 backdrop-blur-sm">
+                  <p className="text-xs uppercase tracking-[0.24em] text-orange-600/80">Urgent Fixes</p>
+                  <p className="mt-2 text-3xl font-black text-stone-800">{urgentIssues}</p>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+
+          <motion.div variants={listVariants} initial="hidden" animate="show" className="space-y-5">
+            {issues.map((issue) => (
+              <IssueCard key={issue.id} issue={issue} />
+            ))}
+            {issues.length === 0 && (
+              <div className="glass rounded-[28px] p-10 text-center text-stone-500 shadow-xl">
+                No issues were returned for this audit.
+              </div>
+            )}
+          </motion.div>
+        </div>
+
+        <div className="space-y-6 xl:col-span-4">
+          <div className="sticky top-24 space-y-6">
+            <DeveloperChecklist issues={issues} />
+            <div className="glass rounded-[28px] p-6 shadow-xl">
+              <div className="flex items-start gap-3">
+                <div className="rounded-2xl bg-gradient-to-r from-orange-100 to-amber-100 p-3 text-orange-500">
+                  <MessageSquareText className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.26em] text-orange-400/70">AI Workflow</p>
+                  <h4 className="mt-2 text-xl font-black text-stone-800">Use the assistant to plan fixes</h4>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <ChatWidget />
+      </div>
+    )
+  }
+
+  if (showLanding) {
+    return <LandingPage onGetStarted={() => setShowLanding(false)} />
+  }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col font-sans">
-      <header className="border-b border-slate-800 bg-slate-900 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="bg-indigo-600 p-2 rounded-lg">
-            <LayoutDashboard className="w-5 h-5 text-white" />
-          </div>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-            UX Guardian
-          </h1>
-        </div>
-      </header>
-
-      <main className="flex-1 p-6 md:p-12 max-w-7xl mx-auto w-full">
-        {!audit ? (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8">
-            <div className="space-y-4 max-w-2xl">
-              <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-                Audit. Understand. Fix. <br/>
-                <span className="text-indigo-400">Deliver Better Experiences.</span>
-              </h2>
-              <p className="text-slate-400 text-lg">
-                Enter any website URL to automatically run accessibility, UX, and SEO audits powered by AI. Get conversational explanations and developer-ready code fixes.
-              </p>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="w-full max-w-xl flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input
-                  type="url"
-                  placeholder="https://example.com"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-100"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  required
-                />
-              </div>
-              <button 
-                type="submit"
-                disabled={loading}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {loading ? (
-                  <Activity className="w-5 h-5 animate-spin" />
-                ) : (
-                  'Run Audit'
-                )}
-              </button>
-            </form>
-          </div>
-        ) : (
-          <div className="space-y-8">
-             <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">Audit Results for <span className="text-indigo-400">{audit.url}</span></h2>
-                  <p className="text-slate-400">Status: {audit.status.toUpperCase()}</p>
-                </div>
-                {loading && (
-                  <div className="flex items-center gap-2 text-indigo-400 bg-indigo-950/50 px-4 py-2 rounded-full border border-indigo-900">
-                    <Activity className="w-4 h-4 animate-spin" />
-                    <span className="text-sm font-medium">AI Reasoning Engine Running...</span>
-                  </div>
-                )}
-             </div>
-
-             {audit.status === 'completed' && (
-               <>
-                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center">
-                      <span className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">Overall Score</span>
-                      <span className={`text-5xl font-black ${audit.overall_score && audit.overall_score >= 80 ? 'text-emerald-400' : audit.overall_score && audit.overall_score >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
-                        {audit.overall_score ?? '--'}
-                      </span>
-                    </div>
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 col-span-3">
-                      <h3 className="text-lg font-semibold mb-4">Found Issues</h3>
-                      <div className="flex gap-4">
-                        {['critical', 'high', 'medium', 'low'].map(sev => {
-                          const count = audit.issues?.filter(i => i.severity === sev).length || 0
-                          const color = sev === 'critical' ? 'text-red-400 bg-red-950/30' : sev === 'high' ? 'text-orange-400 bg-orange-950/30' : sev === 'medium' ? 'text-amber-400 bg-amber-950/30' : 'text-blue-400 bg-blue-950/30'
-                          return (
-                            <div key={sev} className={`flex-1 rounded-lg p-4 border border-slate-800 ${color} flex items-center justify-between`}>
-                              <span className="capitalize font-medium">{sev}</span>
-                              <span className="text-2xl font-bold">{count}</span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                 </div>
-
-                 <div className="grid grid-cols-1 gap-6 mt-8">
-                   <h3 className="text-xl font-semibold">Detailed AI Analysis & Fixes</h3>
-                   {audit.issues?.map(issue => (
-                     <div key={issue.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                        <div className="border-b border-slate-800 p-5 bg-slate-900/50 flex items-start justify-between">
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className={`px-2 py-1 text-xs font-semibold uppercase rounded ${
-                                issue.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                issue.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                issue.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' :
-                                'bg-blue-500/20 text-blue-400'
-                              }`}>
-                                {issue.severity}
-                              </span>
-                              <span className="px-2 py-1 text-xs font-medium uppercase rounded bg-slate-800 text-slate-300">
-                                {issue.category}
-                              </span>
-                            </div>
-                            <h4 className="text-lg font-bold text-slate-100">{issue.title}</h4>
-                          </div>
-                        </div>
-                        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-                           <div>
-                             <h5 className="text-sm font-semibold text-slate-400 mb-2 uppercase tracking-wider">AI Explanation</h5>
-                             <p className="text-slate-300 leading-relaxed">{issue.description}</p>
-                             
-                             <h5 className="text-sm font-semibold text-slate-400 mt-6 mb-2 uppercase tracking-wider">Recommendation</h5>
-                             <p className="text-slate-300 leading-relaxed bg-indigo-950/30 p-4 rounded-lg border border-indigo-900/50">{issue.recommendation}</p>
-                           </div>
-                           
-                           {issue.fixed_code && (
-                             <div>
-                               <h5 className="text-sm font-semibold text-slate-400 mb-2 uppercase tracking-wider flex items-center gap-2">
-                                 <Code className="w-4 h-4"/> Suggested Code Fix
-                               </h5>
-                               <div className="bg-slate-950 rounded-lg p-4 font-mono text-sm border border-slate-800 overflow-x-auto">
-                                 {issue.code_snippet && (
-                                    <div className="mb-4">
-                                      <span className="text-red-400 block mb-1 text-xs">Current (Before)</span>
-                                      <pre className="text-slate-500 line-through"><code>{issue.code_snippet}</code></pre>
-                                    </div>
-                                 )}
-                                 <div>
-                                    <span className="text-emerald-400 block mb-1 text-xs">Recommended (After)</span>
-                                    <pre className="text-emerald-300"><code>{issue.fixed_code}</code></pre>
-                                 </div>
-                               </div>
-                             </div>
-                           )}
-                        </div>
-                     </div>
-                   ))}
-                   {audit.issues?.length === 0 && (
-                     <div className="text-center p-12 bg-slate-900 rounded-xl border border-slate-800">
-                       <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
-                       <h3 className="text-xl font-bold">No issues found!</h3>
-                       <p className="text-slate-400 mt-2">This page looks great according to our AI reasoning engine.</p>
-                     </div>
-                   )}
-                 </div>
-               </>
-             )}
-          </div>
-        )}
-      </main>
-    </div>
+    <>
+      <CommandPalette />
+      <DashboardLayout audit={audit} onDownloadPDF={handleDownloadPDF}>
+        {renderContent()}
+      </DashboardLayout>
+    </>
   )
 }
 

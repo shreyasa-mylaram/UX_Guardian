@@ -23,7 +23,7 @@ async def run_browser_scan(url: str, output_dir: str = "artifacts"):
         page = await context.new_page()
         
         try:
-            await page.goto(url, wait_until="networkidle", timeout=60000)
+            await page.goto(url, wait_until="load", timeout=60000)
         except Exception as e:
             print(f"Error navigating to {url}: {e}")
             await browser.close()
