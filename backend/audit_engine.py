@@ -163,7 +163,9 @@ def generate_ai_analysis(dom_path, screenshot_path, axe_results):
     
     DOM Content (truncated to first 20000 chars): {dom_content[:20000]}
     
-    Identify the top 5 UX/UI or Accessibility issues.
+    Identify the top 5 UX/UI or Accessibility issues, and also classify the industry of the website based on the screenshot and DOM.
+    Valid industries: "E-commerce", "SaaS", "Banking", "Healthcare", "Education", "Media", "Portfolio", "General".
+
     For each issue, provide:
     1. "category": "Accessibility", "UX", "SEO", or "Performance"
     2. "severity": "low", "medium", "high", or "critical"
@@ -177,7 +179,17 @@ def generate_ai_analysis(dom_path, screenshot_path, axe_results):
     10. "code_snippet": HTML/CSS of the current state, if applicable.
     11. "fixed_code": HTML/CSS using Tailwind CSS utility classes and React formatting (e.g. className instead of class) of the recommended fix.
     
-    You must return a valid JSON array of objects with the exact keys: category, severity, title, description, business_impact, confidence_score, estimated_fix_time, recommendation, selector, code_snippet, fixed_code.
+    You must return a valid JSON object with the exact keys:
+    {
+      "industry": "One of the valid industries",
+      "issues": [
+        {
+          "category": "...",
+          "severity": "...",
+          ...
+        }
+      ]
+    }
     """
 
     try:
@@ -204,49 +216,51 @@ def generate_ai_analysis(dom_path, screenshot_path, axe_results):
         )
         parsed_response = _extract_json_payload(response_text)
 
-        if isinstance(parsed_response, list):
-            return parsed_response
-
         if isinstance(parsed_response, dict):
-            if isinstance(parsed_response.get("issues"), list):
-                return parsed_response["issues"]
-            if isinstance(parsed_response.get("data"), list):
-                return parsed_response["data"]
+            if "industry" in parsed_response and "issues" in parsed_response:
+                return parsed_response
 
-        return []
+        # Fallback if it returned just the array
+        if isinstance(parsed_response, list):
+            return {"industry": "General", "issues": parsed_response}
+
+        return {"industry": "General", "issues": []}
     except AIProviderError as e:
         print(f"AI provider error during audit analysis (Mock Mode Enabled): {e}")
-        return [
-            {
-                "category": "UX",
-                "severity": "critical",
-                "title": "Missing Call-to-Action (CTA) Contrast",
-                "description": "The main button blends in with the background, making it hard for users to know where to click. This heavily impacts conversions.",
-                "business_impact": "High",
-                "confidence_score": 95,
-                "estimated_fix_time": "5 minutes",
-                "recommendation": "Update the button background to a high-contrast color like blue or emerald.",
-                "selector": "button.btn-primary",
-                "code_snippet": "<button className=\"bg-gray-200 text-gray-500\">\n  Submit\n</button>",
-                "fixed_code": "<button className=\"bg-blue-600 text-white font-bold hover:bg-blue-700\">\n  Submit\n</button>"
-            },
-            {
-                "category": "Accessibility",
-                "severity": "high",
-                "title": "Missing Alt Text on Hero Image",
-                "description": "Screen readers cannot describe the main image to visually impaired users because the 'alt' attribute is missing.",
-                "business_impact": "Medium",
-                "confidence_score": 100,
-                "estimated_fix_time": "2 minutes",
-                "recommendation": "Add descriptive alt text to the hero image.",
-                "selector": "img.hero-banner",
-                "code_snippet": "<img src=\"/hero.jpg\" className=\"w-full\" />",
-                "fixed_code": "<img src=\"/hero.jpg\" alt=\"Smiling team working in a modern office\" className=\"w-full\" />"
-            }
-        ]
+        return {
+            "industry": "SaaS",
+            "issues": [
+                {
+                    "category": "UX",
+                    "severity": "critical",
+                    "title": "Missing Call-to-Action (CTA) Contrast",
+                    "description": "The main button blends in with the background, making it hard for users to know where to click. This heavily impacts conversions.",
+                    "business_impact": "High",
+                    "confidence_score": 95,
+                    "estimated_fix_time": "5 minutes",
+                    "recommendation": "Update the button background to a high-contrast color like blue or emerald.",
+                    "selector": "button.btn-primary",
+                    "code_snippet": "<button className=\"bg-gray-200 text-gray-500\">\n  Submit\n</button>",
+                    "fixed_code": "<button className=\"bg-blue-600 text-white font-bold hover:bg-blue-700\">\n  Submit\n</button>"
+                },
+                {
+                    "category": "Accessibility",
+                    "severity": "high",
+                    "title": "Missing Alt Text on Hero Image",
+                    "description": "Screen readers cannot describe the main image to visually impaired users because the 'alt' attribute is missing.",
+                    "business_impact": "Medium",
+                    "confidence_score": 100,
+                    "estimated_fix_time": "2 minutes",
+                    "recommendation": "Add descriptive alt text to the hero image.",
+                    "selector": "img.hero-banner",
+                    "code_snippet": "<img src=\"/hero.jpg\" className=\"w-full\" />",
+                    "fixed_code": "<img src=\"/hero.jpg\" alt=\"Smiling team working in a modern office\" className=\"w-full\" />"
+                }
+            ]
+        }
     except Exception as e:
         print(f"Error generating AI analysis: {e}")
-        return []
+        return {"industry": "General", "issues": []}
 
 def generate_chat_response(user_message: str, chat_history: list, audit_context: str, persona: str = "developer"):
     if persona == "ceo":

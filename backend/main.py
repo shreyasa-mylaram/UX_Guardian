@@ -93,11 +93,14 @@ async def process_audit(audit_id: int, url: str):
             scan_results["axe_results"] = []
             
         # Run AI Analysis
-        issues = generate_ai_analysis(
+        analysis_result = generate_ai_analysis(
             scan_results["dom_path"], 
             scan_results["screenshot_path"], 
             scan_results["axe_results"]
         )
+        
+        industry = analysis_result.get("industry", "General") if isinstance(analysis_result, dict) else "General"
+        issues = analysis_result.get("issues", []) if isinstance(analysis_result, dict) else analysis_result
         
         overall_score = 100
         
@@ -157,7 +160,8 @@ async def process_audit(audit_id: int, url: str):
         db_session.query(models.Audit).filter(models.Audit.id == audit_id).update({
             "status": "completed",
             "overall_score": overall_score,
-            "dom_path": scan_results.get("dom_path", "")
+            "dom_path": scan_results.get("dom_path", ""),
+            "industry": industry
         })
         db_session.commit()
     finally:

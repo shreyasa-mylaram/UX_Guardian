@@ -1,27 +1,34 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Calculator, CheckCircle2, Settings2, TrendingDown } from 'lucide-react'
+import { Calculator, CheckCircle2, Settings2, TrendingDown, Sparkles } from 'lucide-react'
 import { INDUSTRY_PRESETS, type BusinessContext } from '../lib/impact-calculator'
 import { useStore } from '../store'
 import { GlassCard } from './GlassCard'
 
 export function BusinessImpactForm() {
-  const { businessContext, setBusinessContext } = useStore()
+  const { businessContext, setBusinessContext, audit } = useStore()
+  
+  const detectedIndustry = audit?.industry || 'E-commerce'
+  
   const [localContext, setLocalContext] = useState<Omit<BusinessContext, 'isConfigured'>>({
-    industry: businessContext.industry || 'E-commerce',
+    industry: businessContext.isConfigured ? businessContext.industry : detectedIndustry,
     monthlyTraffic: businessContext.monthlyTraffic,
     conversionRate: businessContext.conversionRate,
     averageOrderValue: businessContext.averageOrderValue,
   })
 
+  // Auto-apply preset when industry is detected from backend
+  useEffect(() => {
+    if (!businessContext.isConfigured && audit?.industry) {
+      const preset = INDUSTRY_PRESETS[audit.industry] || INDUSTRY_PRESETS['General'] || INDUSTRY_PRESETS['E-commerce']
+      setLocalContext({ ...preset, industry: audit.industry })
+      setBusinessContext({ ...preset, industry: audit.industry, isConfigured: true })
+    }
+  }, [audit?.industry, businessContext.isConfigured, setBusinessContext])
+
   const [isExpanded, setIsExpanded] = useState(!businessContext.isConfigured)
 
-  const handlePresetSelect = (presetName: string) => {
-    const preset = INDUSTRY_PRESETS[presetName]
-    if (preset) {
-      setLocalContext({ ...preset })
-    }
-  }
+
 
   const handleSave = () => {
     setBusinessContext({ ...localContext, isConfigured: true })
@@ -65,27 +72,14 @@ export function BusinessImpactForm() {
       </div>
 
       <div className="space-y-6">
-        {/* Presets */}
-        <div>
-          <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-stone-500">Industry Presets</p>
-          <div className="flex flex-wrap gap-2">
-            {Object.keys(INDUSTRY_PRESETS).map((preset) => (
-              <button
-                key={preset}
-                onClick={() => handlePresetSelect(preset)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
-                  localContext.industry === preset
-                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
-                    : 'bg-stone-100/80 text-stone-600 hover:bg-orange-50 hover:text-orange-600'
-                }`}
-              >
-                {preset}
-              </button>
-            ))}
-          </div>
+        <div className="rounded-xl border border-orange-200/50 bg-orange-50/50 p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold text-orange-700">
+            <Sparkles className="h-4 w-4" /> AI Industry Detection
+          </p>
+          <p className="mt-1 text-sm text-stone-600">
+            Based on our visual and DOM analysis, this website is categorized as <strong className="text-stone-900">{localContext.industry}</strong>. The baseline metrics below have been automatically tailored for this sector.
+          </p>
         </div>
-
-        {/* Inputs */}
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">Monthly Traffic</span>

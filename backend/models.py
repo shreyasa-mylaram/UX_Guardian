@@ -22,6 +22,7 @@ class Audit(Base):
     ux_score = Column(Integer, nullable=True)
     seo_score = Column(Integer, nullable=True)
     dom_path = Column(String, nullable=True)
+    industry = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Issue(Base):

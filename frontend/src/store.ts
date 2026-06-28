@@ -34,6 +34,7 @@ export interface AuditData {
   url: string
   status: string
   overall_score: number | null
+  industry?: string
   issues?: Issue[]
 }
 
